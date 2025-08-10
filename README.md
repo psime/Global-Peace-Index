@@ -11,8 +11,7 @@ This project analyzes Global Peace Index (GPI) data from 2008-2022, providing in
 - Interactive data visualization using Streamlit
 - Analysis of peace index trends over time
 - Country and regional comparisons
-- Data e
-- xploration of GPI scores and domains
+- Data exploration of GPI scores and domains
 
 ## Data Sources
 
