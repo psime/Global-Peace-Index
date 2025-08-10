@@ -127,48 +127,57 @@ def create_metric_card(value, label, color="#ffffff"):
     </div>
     """
 
-# Custom function for country ranking display
-def create_ranking_display(df_ranked, year, rank_type="peaceful"):
+# Custom function for country ranking display using Streamlit components
+def display_rankings(df_ranked, year, rank_type="peaceful"):
     color = "#4CAF50" if rank_type == "peaceful" else "#f44336"
     emoji = "🕊️" if rank_type == "peaceful" else "⚠️"
+    title = f"{emoji} {'Most' if rank_type == 'peaceful' else 'Least'} Peaceful Countries"
     
-    html = f"""
+    # Create header
+    st.markdown(f"""
     <div style="background: rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 20px; margin: 10px 0;">
-        <h3 style="color: white; text-align: center; margin-bottom: 20px;">
-            {emoji} {"Most" if rank_type == "peaceful" else "Least"} Peaceful Countries
-        </h3>
-    """
+        <h3 style="color: white; text-align: center; margin-bottom: 20px;">{title}</h3>
+    </div>
+    """, unsafe_allow_html=True)
     
+    # Display each country with consistent layout
     for i, (_, row) in enumerate(df_ranked.iterrows(), 1):
-        score = row[year]
+        score = row[year] if year in row else row['Change']
         country = row['Country']
         
-        # Create progress bar width (scaled for visualization)
-        if rank_type == "peaceful":
-            width = max(10, 100 - (score * 20))  # Lower scores = wider bars for peaceful
-        else:
-            width = min(100, score * 20)  # Higher scores = wider bars for conflict
+        # Create container with fixed height and consistent spacing
+        with st.container():
+            # Create three columns with specific width ratios
+            col1, col2, col3 = st.columns([3, 4, 2])
             
-        html += f"""
-        <div class="ranking-card">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="flex: 1;">
-                    <strong style="color: white; font-size: 1.1rem;">#{i} {country}</strong>
-                </div>
-                <div style="flex: 1; margin: 0 20px;">
-                    <div style="background: rgba(255,255,255,0.2); border-radius: 10px; height: 20px; position: relative;">
-                        <div style="background: {color}; height: 100%; width: {width}%; border-radius: 10px; transition: width 0.5s ease;"></div>
-                    </div>
-                </div>
-                <div style="color: white; font-weight: bold; min-width: 60px; text-align: right;">
-                    {score:.3f}
-                </div>
-            </div>
-        </div>
-        """
-    
-    html += "</div>"
-    return html
+            with col1:
+                # Truncate long country names and add tooltip
+                display_name = country if len(country) <= 25 else country[:22] + "..."
+                st.markdown(f"**#{i}** {display_name}")
+            
+            with col2:
+                # Create progress bar based on score
+                if year == 'Change':
+                    # For change values, use absolute value and normalize
+                    abs_score = abs(score)
+                    if rank_type == "peaceful":  # Improvements (negative changes)
+                        progress_value = min(1.0, abs_score / 2.0)  # Scale to max expected change
+                    else:  # Worsenings (positive changes)
+                        progress_value = min(1.0, abs_score / 2.0)
+                else:
+                    # For peace index scores (typically 1-4 range)
+                    if rank_type == "peaceful":
+                        progress_value = max(0.1, min(1.0, (4 - score) / 3))  # Lower scores = higher progress
+                    else:
+                        progress_value = min(1.0, max(0.1, (score - 1) / 3))  # Higher scores = higher progress
+                
+                st.progress(progress_value)
+            
+            with col3:
+                st.markdown(f"**{score:.3f}**")
+            
+            # Add consistent spacing between entries
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
 # Sidebar for navigation with custom styling
 with st.sidebar:
@@ -269,7 +278,7 @@ if page == "Yearly Peace Index":
     )
     st.plotly_chart(fig_map, use_container_width=True)
 
-    # Country rankings with progress bars
+    # Country rankings with slider and bar chart
     num_countries = st.slider(
         "📊 Number of countries to display in rankings", 
         min_value=3, 
@@ -282,14 +291,7 @@ if page == "Yearly Peace Index":
     top_n = df_sorted.head(num_countries)
     bottom_n = df_sorted.tail(num_countries)
 
-    # Display rankings side by side
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(create_ranking_display(top_n, year, "peaceful"), unsafe_allow_html=True)
-    with col2:
-        st.markdown(create_ranking_display(bottom_n[::-1], year, "conflict"), unsafe_allow_html=True)
-
-    # Enhanced horizontal bar chart
+    # Enhanced horizontal bar chart (moved above rankings)
     df_bar = pd.concat([top_n, bottom_n])
     df_bar["Type"] = ["Most Peaceful"]*num_countries + ["Least Peaceful"]*num_countries
     df_bar = df_bar.sort_values(by=year, ascending=True)
@@ -312,7 +314,8 @@ if page == "Yearly Peace Index":
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
         font_color="white",
-        title_font_size=18
+        title_font_size=18,
+        height=max(400, num_countries * 35)  # Dynamic height based on number of countries
     )
     
     fig_bar.update_traces(
@@ -321,6 +324,15 @@ if page == "Yearly Peace Index":
                       "Peace Index Score: %{x}<extra></extra>"
     )
     st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.markdown("---")
+
+    # Display rankings side by side with fixed width
+    col1, col2 = st.columns(2)
+    with col1:
+        display_rankings(top_n, year, "peaceful")
+    with col2:
+        display_rankings(bottom_n[::-1], year, "conflict")
 
 # ---------------------------------------
 # Page 2 - Change 2008 to 2022
@@ -408,12 +420,13 @@ else:
     st.plotly_chart(fig_line, use_container_width=True)
 
     # Top improvers and decliners
+    st.markdown("### 🏆 Biggest Changes (2008-2022)")
     col1, col2 = st.columns(2)
     
     with col1:
         top_improvers = df_change.nsmallest(5, 'Change')
-        st.markdown(create_ranking_display(top_improvers, 'Change', 'peaceful'), unsafe_allow_html=True)
+        display_rankings(top_improvers, 'Change', 'peaceful')
     
     with col2:
         top_decliners = df_change.nlargest(5, 'Change')
-        st.markdown(create_ranking_display(top_decliners, 'Change', 'conflict'), unsafe_allow_html=True)
+        display_rankings(top_decliners, 'Change', 'conflict')
