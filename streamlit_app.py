@@ -37,13 +37,22 @@ if page == "Yearly Peace Index":
     )
     st.plotly_chart(fig_map, use_container_width=True)
 
-    # Top & Bottom 5
-    df_sorted = df_year.sort_values(year)
-    top5 = df_sorted.head(5)
-    bottom5 = df_sorted.tail(5)
+    # Number of countries selector
+    num_countries = st.slider(
+        "Number of most/least peaceful countries to show", 
+        min_value=3, 
+        max_value=15, 
+        value=5, 
+        step=1
+    )
 
-    df_bar = pd.concat([top5, bottom5])
-    df_bar["Type"] = ["Most Peaceful"]*5 + ["Least Peaceful"]*5
+    # Top & Bottom N countries
+    df_sorted = df_year.sort_values(year)
+    top_n = df_sorted.head(num_countries)
+    bottom_n = df_sorted.tail(num_countries)
+
+    df_bar = pd.concat([top_n, bottom_n])
+    df_bar["Type"] = ["Most Peaceful"]*num_countries + ["Least Peaceful"]*num_countries
 
     # Sort so that most peaceful appear first, least peaceful last
     df_bar = df_bar.sort_values(by=year, ascending=True)
@@ -55,7 +64,7 @@ if page == "Yearly Peace Index":
         y="Country",
         orientation="h",
         color="Type",
-        title=f"Top 5 Most Peaceful & 5 Least Peaceful Countries ({year})",
+        title=f"Top {num_countries} Most Peaceful & {num_countries} Least Peaceful Countries ({year})",
         color_discrete_map={
             "Most Peaceful": "green",
             "Least Peaceful": "red"
@@ -119,4 +128,3 @@ else:
         }
     )
     st.plotly_chart(fig_line, use_container_width=True)
-
