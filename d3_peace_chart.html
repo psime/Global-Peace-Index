@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3 Peace Index Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .slider-container {
+            margin: 20px 0;
+        }
+        
+        .slider-container label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .slider {
+            width: 200px;
+            margin: 0 10px;
+        }
+        
+        .bar {
+            transition: all 0.3s ease;
+        }
+        
+        .bar.most-peaceful {
+            fill: #2e8b57;
+        }
+        
+        .bar.least-peaceful {
+            fill: #dc143c;
+        }
+        
+        .bar:hover {
+            opacity: 0.8;
+            cursor: pointer;
+        }
+        
+        .axis {
+            font-size: 12px;
+        }
+        
+        .axis-label {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            gap: 30px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">Global Peace Index 2022 - Interactive D3 Visualization</div>
+        
+        <div class="controls">
+            <div class="slider-container">
+                <label for="countrySlider">Number of countries to show:</label>
+                <input type="range" id="countrySlider" class="slider" min="3" max="12" value="5" step="1">
+                <span id="countryCount">5</span>
+            </div>
+        </div>
+        
+        <div id="chart"></div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #2e8b57;"></div>
+                <span>Most Peaceful</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #dc143c;"></div>
+                <span>Least Peaceful</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Sample data based on Global Peace Index 2022
+        const peaceData = [
+            {country: "Iceland", score: 1.107, type: "most"},
+            {country: "Denmark", score: 1.296, type: "most"},
+            {country: "Ireland", score: 1.288, type: "most"},
+            {country: "New Zealand", score: 1.269, type: "most"},
+            {country: "Austria", score: 1.265, type: "most"},
+            {country: "Singapore", score: 1.326, type: "most"},
+            {country: "Portugal", score: 1.301, type: "most"},
+            {country: "Slovenia", score: 1.316, type: "most"},
+            {country: "Japan", score: 1.336, type: "most"},
+            {country: "Switzerland", score: 1.357, type: "most"},
+            {country: "Czech Republic", score: 1.318, type: "most"},
+            {country: "Canada", score: 1.389, type: "most"},
+            {country: "Afghanistan", score: 3.554, type: "least"},
+            {country: "Yemen", score: 3.394, type: "least"},
+            {country: "Syria", score: 3.356, type: "least"},
+            {country: "Russia", score: 3.275, type: "least"},
+            {country: "South Sudan", score: 3.184, type: "least"},
+            {country: "Iraq", score: 3.157, type: "least"},
+            {country: "Somalia", score: 3.125, type: "least"},
+            {country: "Ukraine", score: 2.971, type: "least"},
+            {country: "Sudan", score: 2.935, type: "least"},
+            {country: "Burkina Faso", score: 2.928, type: "least"},
+            {country: "Mali", score: 2.911, type: "least"},
+            {country: "Libya", score: 2.930, type: "least"}
+        ];
+
+        // Chart dimensions and setup
+        const margin = {top: 20, right: 150, bottom: 60, left: 200};
+        const width = 800 - margin.left - margin.right;
+        const height = 600 - margin.bottom - margin.top;
+
+        // Create SVG
+        const svg = d3.select("#chart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.bottom + margin.top);
+
+        const g = svg.append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Scales
+        const xScale = d3.scaleLinear()
+            .range([0, width]);
+
+        const yScale = d3.scaleBand()
+            .range([height, 0])
+            .padding(0.1);
+
+        // Axes
+        const xAxis = d3.axisBottom(xScale)
+            .tickFormat(d3.format(".2f"));
+        
+        const yAxis = d3.axisLeft(yScale);
+
+        const xAxisGroup = g.append("g")
+            .attr("class", "axis")
+            .attr("transform", `translate(0,${height})`);
+
+        const yAxisGroup = g.append("g")
+            .attr("class", "axis");
+
+        // Axis labels
+        g.append("text")
+            .attr("class", "axis-label")
+            .attr("x", width / 2)
+            .attr("y", height + 50)
+            .style("text-anchor", "middle")
+            .text("Peace Index Score (Lower = More Peaceful)");
+
+        g.append("text")
+            .attr("class", "axis-label")
+            .attr("transform", "rotate(-90)")
+            .attr("y", -margin.left + 20)
+            .attr("x", -height / 2)
+            .style("text-anchor", "middle")
+            .text("Countries");
+
+        // Tooltip
+        const tooltip = d3.select("#tooltip");
+
+        // Update function
+        function updateChart(numCountries) {
+            // Get top N most peaceful and least peaceful
+            const mostPeaceful = peaceData.filter(d => d.type === "most")
+                .sort((a, b) => a.score - b.score)
+                .slice(0, numCountries);
+            
+            const leastPeaceful = peaceData.filter(d => d.type === "least")
+                .sort((a, b) => b.score - a.score)
+                .slice(0, numCountries);
+
+            const chartData = [...mostPeaceful, ...leastPeaceful]
+                .sort((a, b) => a.score - b.score);
+
+            // Update scales
+            xScale.domain([0, d3.max(chartData, d => d.score) * 1.1]);
+            yScale.domain(chartData.map(d => d.country));
+
+            // Update axes
+            xAxisGroup.transition().duration(750).call(xAxis);
+            yAxisGroup.transition().duration(750).call(yAxis);
+
+            // Bind data
+            const bars = g.selectAll(".bar")
+                .data(chartData, d => d.country);
+
+            // Remove old bars
+            bars.exit()
+                .transition()
+                .duration(500)
+                .attr("width", 0)
+                .remove();
+
+            // Add new bars
+            const barsEnter = bars.enter()
+                .append("rect")
+                .attr("class", d => `bar ${d.type}-peaceful`)
+                .attr("y", d => yScale(d.country))
+                .attr("height", yScale.bandwidth())
+                .attr("x", 0)
+                .attr("width", 0);
+
+            // Merge and update all bars
+            bars.merge(barsEnter)
+                .on("mouseover", function(event, d) {
+                    tooltip.style("opacity", 1)
+                        .html(`<strong>${d.country}</strong><br>
+                               ${d.type === 'most' ? 'Most Peaceful' : 'Least Peaceful'}<br>
+                               Peace Index Score: ${d.score.toFixed(3)}`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.style("opacity", 0);
+                })
+                .transition()
+                .duration(750)
+                .attr("y", d => yScale(d.country))
+                .attr("height", yScale.bandwidth())
+                .attr("width", d => xScale(d.score));
+        }
+
+        // Slider event listener
+        const slider = d3.select("#countrySlider");
+        const countDisplay = d3.select("#countryCount");
+
+        slider.on("input", function() {
+            const numCountries = +this.value;
+            countDisplay.text(numCountries);
+            updateChart(numCountries);
+        });
+
+        // Initial render
+        updateChart(5);
+    </script>
+</body>
+</html>

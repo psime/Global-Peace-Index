@@ -75,6 +75,13 @@ if page == "Yearly Peace Index":
             "Country": "Country Name"
         }
     )
+    
+    # Customize hover template
+    fig_bar.update_traces(
+        hovertemplate="<b>%{y}</b><br>" +
+                      "%{fullData.name}<br>" +
+                      "Peace Index Score: %{x}<extra></extra>"
+    )
     st.plotly_chart(fig_bar, use_container_width=True)
 
 # ---------------------------------------
